@@ -2,6 +2,9 @@ import argparse
 import os
 import yaml
 import torch
+import torch.optim as optim
+import torch.optim.lr_scheduler as lr_scheduler
+import torchvision.transforms as transforms
 from super_gradients.training import Trainer
 from super_gradients.training.dataloaders.dataloaders import coco_detection_yolo_format_train, coco_detection_yolo_format_val
 from super_gradients.training.losses import PPYoloELoss
@@ -46,12 +49,23 @@ dataset_params = {
     'classes': data_config['names']
 }
 
+# train_transforms = transforms.Compose([
+#     transforms.RandomHorizontalFlip(p=0.5),
+#     transforms.RandomVerticalFlip(p=0.5),
+#     transforms.RandomResizedCrop(size=512, scale=(0.8, 1.2)),
+#     transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+#     transforms.RandomGrayscale(p=0.1),
+#     transforms.ToTensor(),
+#     transforms.Normalize(mean=[0.485, 0.456, 0.406],
+#                          std=[0.229, 0.224, 0.225])
+# ])
+
 train_data = coco_detection_yolo_format_train(
     dataset_params={
         'data_dir': dataset_params['data_dir'],
         'images_dir': dataset_params['train_images_dir'],
         'labels_dir': dataset_params['train_labels_dir'],
-        'classes': dataset_params['classes']
+        'classes': dataset_params['classes'],
     },
     dataloader_params={
         'batch_size': args.batch_size,
@@ -75,35 +89,51 @@ val_data = coco_detection_yolo_format_val(
 train_data.dataset.transforms
 train_data.dataset.dataset_params['transforms'][1]
 train_data.dataset.dataset_params['transforms'][1]['DetectionRandomAffine']['degrees'] = 10.42
+train_data.dataset.dataset_params['transforms'][1]['DetectionNormalize'] = {'mean' :[0.485, 0.456, 0.406] , 'std' : [0.229, 0.224, 0.225]}
+train_data.dataset.dataset_params['transforms'][1]['DetectionHorizontalFlip'] = {'probability' : 0.5}
+train_data.dataset.dataset_params['transforms'][1]['DetectionResize'] = {'resize': [512, 512], 'padded_size': [640, 640], 'pad_value': 114}
+train_data.dataset.dataset_params['transforms'][1]['ToTensor'] = ()
+train_data.dataset.dataset_params['transforms'][1]['DetectionVerticalFlip'] = {'probability' : 0.5}
+train_data.dataset.dataset_params['transforms'][1]['RandomGrayscale'] = {'probability' : 0.1}
+train_data.dataset.dataset_params['transforms'][1]['ColorJitter'] = {'brightness' : 0.3, 'contrast' : 0.3, 'saturation' : 0.3, 'hue' : 0.1}
 
 model = get('yolo_nas_l',
             num_classes=len(dataset_params['classes']),
             pretrained_weights='coco')
 
+#optimizer = optim.Adam(model.parameters(), lr=1e-6, weight_decay=1e-4)
+optimizer = optim.SGD(model.parameters(), lr=0.002, momentum=0.9, weight_decay=0.0005)
+
+lr_scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=0.01, total_steps=5 * len(train_data), anneal_strategy='cos', pct_start=0.2)
+
 train_params = {
     # ENABLING SILENT MODE
-    'silent_mode': True,
+    #'silent_mode': True,
     "average_best_models":True,
-    "warmup_mode": "linear_epoch_step",
-    "warmup_initial_lr": 1e-6,
-    "lr_warmup_epochs": 3,
-    "initial_lr": 5e-4,
-    "lr_mode": "cosine",
-    "cosine_final_lr_ratio": 0.1,
-    "optimizer": "Adam",
-    "optimizer_params": {"weight_decay": 0.0001},
+    "initial_lr": 1e-6,
+    "optimizer": optimizer,
+    
+    #Adam
+    #"optimizer_params": {"weight_decay": 0.0001},
+    #"loss": torch.nn.SmoothL1Loss(),
+    
+    #SGD
+    "optimizer_params": {"weight_decay": 0.0005},
+    "loss": PPYoloELoss(
+        # NOTE: num_classes needs to be defined here
+        num_classes=len(dataset_params['classes']),
+        
+        
+    ),
+
+    "lr_schedule_function": lr_scheduler,
     "zero_weight_decay_on_bias_and_bn": True,
     "ema": True,
     "ema_params": {"decay": 0.9, "decay_type": "threshold"},
     # ONLY TRAINING FOR 10 EPOCHS FOR THIS EXAMPLE NOTEBOOK
     "max_epochs": args.epochs,
     "mixed_precision": True,
-    "loss": PPYoloELoss(
-        use_static_assigner=False,
-        # NOTE: num_classes needs to be defined here
-        num_classes=len(dataset_params['classes']),
-        reg_max=16
-    ),
+    
     "valid_metrics_list": [
         DetectionMetrics_050(
             score_thres=0.1,
