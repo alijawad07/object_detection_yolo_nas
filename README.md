@@ -53,4 +53,5 @@ python3 test.py --data --source --output --weights --conf
 This will run the model on the test set and save the results in the runs/detect directory.
 
 ## Acknowledgements
-Huge shoutout to Nicolai for giving a starting point : https://github.com/niconielsen32
+Huge shoutout to [Nicolai Høirup Nielsen](https://github.com/niconielsen32) and [Piotr Skalski](https://github.com/SkalskiP) for inspirtation for giving a starting point.
+
