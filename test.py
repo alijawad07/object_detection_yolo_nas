@@ -123,7 +123,7 @@ for filename in tqdm(os.listdir(args.source)):
 
                             boxes.append([x1, y1, x2, y2])
                             scores.append(float(confidence[i]))
-                            labels_int.append(int(label))
+                            labels_int.append(label)
 
 
                 # Draw the bounding boxes and class labels on the image
@@ -131,10 +131,15 @@ for filename in tqdm(os.listdir(args.source)):
                     
                     x1, y1, x2, y2 = box
                     color = get_color(label)
+                    label_int = None
+                    for k, v in label_names.items():
+                        if v == label:
+                            label_int = k
+                            break
                     class_name = label_names.get(label, 'unknown')
                     
                     cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness=2)
-                    cv2.putText(frame, class_name, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                    cv2.putText(frame, f'{class_name}:{score:.2f}', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                       
                 
                 # Convert the image to PNG format
@@ -214,7 +219,7 @@ for filename in tqdm(os.listdir(args.source)):
                 class_name = label_names.get(label_int, 'unknown')
                
                 cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness=2)
-                cv2.putText(image, class_name, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                cv2.putText(image, f'{class_name}:{score:.2f}', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                 
             # Save the image with bounding boxes to the output directory
             output_path = os.path.join(output_dir_images, filename)
