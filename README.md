@@ -10,7 +10,6 @@ This repository contains scripts for training and testing an object detection mo
 ```
 pip install super-gradients==3.1.0
 pip install imutils
-pip install torch
 pip install opencv-python
 ```
 ## Dataset
